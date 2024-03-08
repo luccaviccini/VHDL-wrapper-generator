@@ -64,11 +64,16 @@ def generate_wrapper():
             internal_signal_name = f"{name}_flat"
             std_logic_vector_range = f"std_logic_vector({num_instances*bits_per_instance-1} downto 0)"
             internal_signals_declaration += f"    signal {internal_signal_name}: {std_logic_vector_range};\n"
-            if direction.upper() == "IN":
-                flatten_unflatten_logic_code += f"    {internal_signal_name} <= "
-                flatten_unflatten_logic_code += " & ".join([f"{name}(i)({bits_per_instance}-1 downto 0)" for i in range(num_instances)]) + ";\n"
-            else:
-                flatten_unflatten_logic_code += "\n".join([f"    {name}(i)({bits_per_instance}-1 downto 0) <= {internal_signal_name}({i * bits_per_instance} + {bits_per_instance}-1 downto {i * bits_per_instance});" for i in range(num_instances)]) + "\n"
+            if ((direction == "IN") or (direction == 'in')):  # Input signal, flatten                
+                flatten_unflatten_logic_code += f"    -- Flatten input signal {name}\n"
+                flatten_unflatten_logic_code += f"    {name}_flat: for i in 0 to {num_instances-1} generate\n"
+                flatten_unflatten_logic_code += f"        {internal_signal_name}((i*{bits_per_instance}) + {bits_per_instance}-1 downto i*{bits_per_instance}) <= {name}(i)({bits_per_instance}-1 downto 0);\n"
+                flatten_unflatten_logic_code += f"    end generate gen_{name}_flatten;\n\n"
+            elif direction == "OUT":  # Output signal, unflatten
+                flatten_unflatten_logic_code += f"    -- Unflatten output signal {name}\n"
+                flatten_unflatten_logic_code += f"    {name}_flat: for i in 0 to {num_instances-1} generate\n"
+                flatten_unflatten_logic_code += f"        {name}(i)({bits_per_instance}-1 downto 0) <= {internal_signal_name}((i*{bits_per_instance}) + {bits_per_instance}-1 downto i*{bits_per_instance});\n"
+                flatten_unflatten_logic_code += f"    end generate gen_{name}_unflatten;\n\n"           
             port_map_code += f"            {name} => {internal_signal_name},\n"
         else:
             port_definition = f" {type_}({range_})" if range_ else f" {type_}"
