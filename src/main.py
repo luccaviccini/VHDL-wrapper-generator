@@ -31,13 +31,32 @@ def on_flatten_signal():
     if not selected_item:
         messagebox.showwarning("Warning", "Please select a signal")
         return
-    num_instances = simpledialog.askinteger("Input", "Number of instances:", parent=root)
-    if num_instances is None:
+    _, _, _, range_, _ = tree.item(selected_item)["values"]
+    
+    try:
+        range_parts = re.findall(r'\d+', range_)
+        if len(range_parts) == 2:
+            high, low = map(int, range_parts)
+            original_size = abs(high - low) + 1
+        else:
+            messagebox.showerror("Error", "Invalid range format.")
+            return
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to parse range: {e}")
         return
+
     num_bits = simpledialog.askinteger("Input", "Number of bits per instance", parent=root)
-    if num_bits is None:
+    if num_bits is None or num_bits <= 0:
+        messagebox.showerror("Error", "Invalid number of bits.")
         return
+
+    num_instances = original_size // num_bits
+    if original_size % num_bits != 0:
+        messagebox.showerror("Error", f"The total bits ({original_size}) is not evenly divisible by {num_bits} bits per instance. Check again if this is what you need.")
+        return
+    
     tree.set(selected_item, "Flatten", f"{num_instances}x{num_bits}")
+
 
 def clear_all():
     vhdl_input.delete("1.0", tk.END)
@@ -52,7 +71,7 @@ def generate_wrapper():
     internal_signals_declaration = ""
     flatten_unflatten_logic_code = ""
     port_map_code = ""
-    package_vhdl = "library ieee;\nuse ieee.std_logic_1164.all;\npackage latome_hls_pkg is\n"
+    package_vhdl = "library ieee;\nuse ieee.std_logic_1164.all;\n\npackage latome_hls_pkg is\n"
     custom_types = {}
     for child in tree.get_children():
         name, direction, type_, range_, flatten_option = tree.item(child)["values"]
@@ -66,13 +85,13 @@ def generate_wrapper():
             internal_signals_declaration += f"    signal {internal_signal_name}: {std_logic_vector_range};\n"
             if ((direction == "IN") or (direction == 'in')):  # Input signal, flatten                
                 flatten_unflatten_logic_code += f"    -- Flatten input signal {name}\n"
-                flatten_unflatten_logic_code += f"    {name}_flat: for i in 0 to {num_instances-1} generate\n"
-                flatten_unflatten_logic_code += f"        {internal_signal_name}((i*{bits_per_instance}) + {bits_per_instance}-1 downto i*{bits_per_instance}) <= {name}(i)({bits_per_instance}-1 downto 0);\n"
-                flatten_unflatten_logic_code += f"    end generate gen_{name}_flatten;\n\n"
+                flatten_unflatten_logic_code += f"    gen_{name}_unflatten: for i in 0 to {num_instances-1} generate\n"
+                flatten_unflatten_logic_code += f"        {internal_signal_name}((i*{bits_per_instance}) + ({bits_per_instance}-1) downto i*{bits_per_instance}) <= {name}(i)(({bits_per_instance}-1) downto 0);\n"
+                flatten_unflatten_logic_code += f"    end generate gen_{name}_unflatten;\n\n"
             elif direction == "OUT":  # Output signal, unflatten
                 flatten_unflatten_logic_code += f"    -- Unflatten output signal {name}\n"
-                flatten_unflatten_logic_code += f"    {name}_flat: for i in 0 to {num_instances-1} generate\n"
-                flatten_unflatten_logic_code += f"        {name}(i)({bits_per_instance}-1 downto 0) <= {internal_signal_name}((i*{bits_per_instance}) + {bits_per_instance}-1 downto i*{bits_per_instance});\n"
+                flatten_unflatten_logic_code += f"    gen_{name}_unflatten: for i in 0 to {num_instances-1} generate\n"
+                flatten_unflatten_logic_code += f"        {name}(i)(({bits_per_instance}-1) downto 0) <= {internal_signal_name}((i*{bits_per_instance}) + ({bits_per_instance}-1) downto i*{bits_per_instance});\n"
                 flatten_unflatten_logic_code += f"    end generate gen_{name}_unflatten;\n\n"           
             port_map_code += f"            {name} => {internal_signal_name},\n"
         else:
