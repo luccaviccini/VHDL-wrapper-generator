@@ -73,32 +73,34 @@ def generate_wrapper():
     port_map_code = ""
     package_vhdl = "library ieee;\nuse ieee.std_logic_1164.all;\n\npackage latome_hls_pkg is\n"
     custom_types = {}
+    ports_declaration = []  # List to hold ports declarations
     for child in tree.get_children():
         name, direction, type_, range_, flatten_option = tree.item(child)["values"]
         if flatten_option:
             num_instances, bits_per_instance = map(int, flatten_option.split('x'))
             custom_type_name = f"array{num_instances}x{bits_per_instance}_t"
             custom_types[custom_type_name] = (num_instances, bits_per_instance)
-            wrapper_vhdl += f"        {name} : {direction.upper()} {custom_type_name};\n"
+            ports_declaration.append(f"        {name} : {direction.upper()} {custom_type_name}")
             internal_signal_name = f"{name}_flat"
             std_logic_vector_range = f"std_logic_vector({num_instances*bits_per_instance-1} downto 0)"
             internal_signals_declaration += f"    signal {internal_signal_name}: {std_logic_vector_range};\n"
-            if ((direction == "IN") or (direction == 'in')):  # Input signal, flatten                
+            if direction.upper() == "IN":  # Input signal, flatten                
                 flatten_unflatten_logic_code += f"    -- Flatten input signal {name}\n"
                 flatten_unflatten_logic_code += f"    gen_{name}_unflatten: for i in 0 to {num_instances-1} generate\n"
-                flatten_unflatten_logic_code += f"        {internal_signal_name}((i*{bits_per_instance}) + ({bits_per_instance}-1) downto i*{bits_per_instance}) <= {name}(i)(({bits_per_instance}-1) downto 0);\n"
+                flatten_unflatten_logic_code += f"        {internal_signal_name}((i*{bits_per_instance}) + {bits_per_instance}-1 downto i*{bits_per_instance}) <= {name}(i)({bits_per_instance}-1 downto 0);\n"
                 flatten_unflatten_logic_code += f"    end generate gen_{name}_unflatten;\n\n"
-            elif direction == "OUT":  # Output signal, unflatten
+            elif direction.upper() == "OUT":  # Output signal, unflatten
                 flatten_unflatten_logic_code += f"    -- Unflatten output signal {name}\n"
                 flatten_unflatten_logic_code += f"    gen_{name}_unflatten: for i in 0 to {num_instances-1} generate\n"
-                flatten_unflatten_logic_code += f"        {name}(i)(({bits_per_instance}-1) downto 0) <= {internal_signal_name}((i*{bits_per_instance}) + ({bits_per_instance}-1) downto i*{bits_per_instance});\n"
+                flatten_unflatten_logic_code += f"        {name}(i)({bits_per_instance}-1 downto 0) <= {internal_signal_name}((i*{bits_per_instance}) + {bits_per_instance}-1 downto i*{bits_per_instance});\n"
                 flatten_unflatten_logic_code += f"    end generate gen_{name}_unflatten;\n\n"           
             port_map_code += f"            {name} => {internal_signal_name},\n"
         else:
             port_definition = f" {type_}({range_})" if range_ else f" {type_}"
-            direction = direction.upper()
-            wrapper_vhdl += f"        {name} : {direction} {port_definition};\n"
+            ports_declaration.append(f"        {name} : {direction.upper()} {port_definition}")
             port_map_code += f"            {name} => {name},\n"
+    # Join the ports declarations, separating them with semicolons, except the last one
+    wrapper_vhdl += ";\n".join(ports_declaration) + "\n"
     for custom_type, (instances, bits) in custom_types.items():
         package_vhdl += f"    type {custom_type} is array (0 to {instances-1}) of std_logic_vector({bits-1} downto 0);\n"
     package_vhdl += "end latome_hls_pkg;"
@@ -112,6 +114,7 @@ def generate_wrapper():
     vhdl_output_wrapper.insert(tk.INSERT, wrapper_vhdl)
     vhdl_package_def.delete("1.0", tk.END)
     vhdl_package_def.insert(tk.INSERT, package_vhdl)
+
 
 def show_vhdl_code(vhdl_code):
     code_window = tk.Toplevel(root)
