@@ -78,9 +78,9 @@ def generate_wrapper():
         name, direction, type_, range_, flatten_option = tree.item(child)["values"]
         if flatten_option:
             num_instances, bits_per_instance = map(int, flatten_option.split('x'))
-            custom_type_name = f"array{num_instances}x{bits_per_instance}_t"
+            custom_type_name = f"array{bits_per_instance}_t"
             custom_types[custom_type_name] = (num_instances, bits_per_instance)
-            ports_declaration.append(f"        {name} : {direction.upper()} {custom_type_name}")
+            ports_declaration.append(f"        {name} : {direction.upper()} {custom_type_name}(0 to {num_instances-1})")
             internal_signal_name = f"{name}_flat"
             std_logic_vector_range = f"std_logic_vector({num_instances*bits_per_instance-1} downto 0)"
             internal_signals_declaration += f"    signal {internal_signal_name}: {std_logic_vector_range};\n"
@@ -102,7 +102,7 @@ def generate_wrapper():
     # Join the ports declarations, separating them with semicolons, except the last one
     wrapper_vhdl += ";\n".join(ports_declaration) + "\n"
     for custom_type, (instances, bits) in custom_types.items():
-        package_vhdl += f"    type {custom_type} is array (0 to {instances-1}) of std_logic_vector({bits-1} downto 0);\n"
+        package_vhdl += f"    type {custom_type} is array (natural range <>) of std_logic_vector({bits-1} downto 0);\n"
     package_vhdl += "end latome_hls_pkg;"
     wrapper_vhdl += "    );\nend " + wrapper_entity_name + ";\n\n"
     wrapper_vhdl += "architecture Behavioral of " + wrapper_entity_name + " is\n"
