@@ -87,12 +87,12 @@ def generate_wrapper():
             if direction.upper() == "IN":  # Input signal, flatten                
                 flatten_unflatten_logic_code += f"    -- Flatten input signal {name}\n"
                 flatten_unflatten_logic_code += f"    gen_{name}_unflatten: for i in 0 to {num_instances-1} generate\n"
-                flatten_unflatten_logic_code += f"        {internal_signal_name}((i*{bits_per_instance}) + {bits_per_instance}-1 downto i*{bits_per_instance}) <= {name}(i)({bits_per_instance}-1 downto 0);\n"
+                flatten_unflatten_logic_code += f"        {internal_signal_name}((i*{bits_per_instance}) + ({bits_per_instance}-1) downto i*{bits_per_instance}) <= {name}(i)(({bits_per_instance}-1) downto 0);\n"
                 flatten_unflatten_logic_code += f"    end generate gen_{name}_unflatten;\n\n"
             elif direction.upper() == "OUT":  # Output signal, unflatten
                 flatten_unflatten_logic_code += f"    -- Unflatten output signal {name}\n"
                 flatten_unflatten_logic_code += f"    gen_{name}_unflatten: for i in 0 to {num_instances-1} generate\n"
-                flatten_unflatten_logic_code += f"        {name}(i)({bits_per_instance}-1 downto 0) <= {internal_signal_name}((i*{bits_per_instance}) + {bits_per_instance}-1 downto i*{bits_per_instance});\n"
+                flatten_unflatten_logic_code += f"        {name}(i)(({bits_per_instance}-1) downto 0) <= {internal_signal_name}((i*{bits_per_instance}) + ({bits_per_instance}-1) downto i*{bits_per_instance});\n"
                 flatten_unflatten_logic_code += f"    end generate gen_{name}_unflatten;\n\n"           
             port_map_code += f"            {name} => {internal_signal_name},\n"
         else:
